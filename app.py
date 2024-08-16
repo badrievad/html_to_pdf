@@ -10,6 +10,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
 from config import URL_TO_OFFER, PATH_TO_PDF
+from yandex_cloud_api import yandex_upload_file_s3
 
 app = Flask(__name__)
 
@@ -53,12 +54,14 @@ async def generate_pdf_async(calc_id, user_login):
     output_dir = os.path.join(PATH_TO_PDF, user_login)
     os.makedirs(output_dir, exist_ok=True)  # Создает каталог, если его нет
 
-    output_pdf_path = fr"{PATH_TO_PDF}\{user_login}\Коммерческое предложение (id_{calc_id}).pdf"
+    file_name = f"Коммерческое предложение (id_{calc_id}).pdf"
+    output_pdf_path = fr"{PATH_TO_PDF}\{user_login}\{file_name}"
 
     start = time.time()
     result = await loop.run_in_executor(
         executor, generate_pdf_task, calc_id, output_pdf_path
     )
+    yandex_upload_file_s3(output_pdf_path, file_name)
     print(f"PDF generated for {user_login} in {time.time() - start:.2f} seconds")
     return result
 
