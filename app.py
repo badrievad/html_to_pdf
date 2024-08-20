@@ -1,84 +1,72 @@
-import asyncio
-import base64
+import uvicorn
 import os
-import time
-
-from concurrent.futures import ThreadPoolExecutor
-
-from flask import Flask, jsonify, request
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from pyppeteer import launch
 
 from config import URL_TO_OFFER, PATH_TO_PDF
 from yandex_cloud_api import yandex_upload_file_s3
 
-app = Flask(__name__)
-
-executor = ThreadPoolExecutor(max_workers=4)
+app = FastAPI()
 
 
-def generate_pdf_task(calc_id, output_pdf_path):
-    chrome_options = Options()
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--headless")
-
-    driver = webdriver.Chrome(options=chrome_options)
-    driver.get(f"{URL_TO_OFFER}/{calc_id}")
-
-    time.sleep(3)
-
-    result = driver.execute_cdp_cmd(
-        "Page.printToPDF",
-        {
-            "printBackground": True,
-            "preferCSSPageSize": True,
-            "marginTop": 0,
-            "marginBottom": 0,
-            "marginLeft": 0,
-            "marginRight": 0,
-        },
-    )
-
-    with open(output_pdf_path, "wb") as file:
-        file.write(base64.b64decode(result["data"]))
-
-    driver.quit()
-    return output_pdf_path
+class PDFRequest(BaseModel):
+    calc_id: int
+    user_login: str
 
 
 async def generate_pdf_async(calc_id, user_login):
-    loop = asyncio.get_event_loop()
+    browser = await launch(
+        executablePath="C:/Program Files/Google/Chrome/Application/chrome.exe"
+    )
+    page = await browser.newPage()
 
-    output_dir = os.path.join(PATH_TO_PDF, user_login)
-    os.makedirs(output_dir, exist_ok=True)  # Создает каталог, если его нет
+    # Дождаться полной загрузки страницы, включая шрифты и изображения
+    await page.goto(f"{URL_TO_OFFER}/{calc_id}", {"waitUntil": "networkidle2"})
+
+    # Принудительно выполнить рендеринг всех шрифтов
+    await page.evaluate(
+        """() => {
+        document.fonts.ready.then(() => console.log('Fonts loaded'));
+    }"""
+    )
 
     file_name = f"Коммерческое предложение (id_{calc_id}).pdf"
-    output_pdf_path = fr"{PATH_TO_PDF}\{user_login}\{file_name}"
+    output_pdf_path = os.path.join(PATH_TO_PDF, user_login, file_name)
 
-    start = time.time()
-    result = await loop.run_in_executor(
-        executor, generate_pdf_task, calc_id, output_pdf_path
+    # Создание директорий, если они не существуют
+    os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
+
+    # Создание PDF с включенным фоном
+    await page.pdf(
+        {
+            "path": output_pdf_path,
+            "format": "A4",
+            "printBackground": True,  # Включить фоновый цвет и изображения
+        }
     )
+
+    await browser.close()
+
+    # Загрузка файла на Яндекс.Диск или S3
     yandex_upload_file_s3(output_pdf_path, file_name)
-    print(f"PDF generated for {user_login} in {time.time() - start:.2f} seconds")
-    return result
+
+    return output_pdf_path
 
 
-@app.route("/generate_pdf", methods=["POST"])
-async def generate_pdf():
-    data = request.json
-    calc_id = data.get("calc_id")
-    user_login = data.get("user_login")
+@app.post("/generate_pdf")
+async def generate_pdf(request: PDFRequest):
+    calc_id = request.calc_id
+    user_login = request.user_login
 
     if not calc_id or not user_login:
-        return jsonify({"status": "error", "message": "calc_id и user_login обязательны"}), 400
+        raise HTTPException(status_code=400, detail="calc_id и user_login обязательны")
 
-    task = asyncio.create_task(generate_pdf_async(calc_id, user_login))
-    pdf_path = await task
-    return jsonify({"status": "Completed", "pdf_path": pdf_path})
+    # Запуск асинхронной задачи и ожидание ее завершения
+    pdf_path = await generate_pdf_async(calc_id, user_login)
+
+    return {"status": "Completed", "pdf_path": pdf_path}
 
 
 if __name__ == "__main__":
-    app.run(debug=False, host="0.0.0.0", port=8003)
+    uvicorn.run(app, host="0.0.0.0", port=8003)
