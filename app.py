@@ -1,21 +1,12 @@
-import uvicorn
 import os
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 from pyppeteer import launch
 
 from config import URL_TO_OFFER, PATH_TO_PDF
+from pydantic_models import PDFRequest
 from yandex_cloud_api import yandex_upload_file_s3
 
 app = FastAPI()
-
-
-class PDFRequest(BaseModel):
-    calc_id: int
-    user_login: str
-    user_name: str
-    user_email: str
-    user_phone: str
 
 
 async def generate_pdf_async(calc_id, data: PDFRequest):
@@ -41,11 +32,13 @@ async def generate_pdf_async(calc_id, data: PDFRequest):
 
     os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
 
-    await page.pdf({
-        "path": output_pdf_path,
-        "format": "A4",
-        "printBackground": True,
-    })
+    await page.pdf(
+        {
+            "path": output_pdf_path,
+            "format": "A4",
+            "printBackground": True,
+        }
+    )
 
     await browser.close()
 
@@ -65,7 +58,3 @@ async def generate_pdf(request: PDFRequest):
     pdf_path = await generate_pdf_async(calc_id, request)
 
     return {"status": "Completed", "pdf_path": pdf_path}
-
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8003)
