@@ -1,3 +1,4 @@
+import logging
 import os
 from fastapi import FastAPI, HTTPException
 from pyppeteer import launch
@@ -18,6 +19,7 @@ async def generate_pdf_async(calc_id, data: PDFRequest):
     # Формирование URL с параметрами
     full_url = f"{URL_TO_OFFER}/{calc_id}?user_login={data.user_login}&name={data.user_name}&email={data.user_email}&phone={data.user_phone}"
     # Переход на страницу с параметрами
+    logging.info(f"URL: {full_url}")
     await page.goto(full_url, {"waitUntil": "networkidle2"})
 
     # Принудительно выполнить рендеринг всех шрифтов
@@ -49,9 +51,14 @@ async def generate_pdf_async(calc_id, data: PDFRequest):
 
 @app.post("/generate_pdf")
 async def generate_pdf(request: PDFRequest):
+    logging.info("Generating PDF")
+    logging.info(f"REQUEST: {request}")
     calc_id = request.calc_id
 
     if not calc_id or not request.user_login:
+        logging.info(
+            f"calc_id: {calc_id} и user_login: {request.user_login} обязательны"
+        )
         raise HTTPException(status_code=400, detail="calc_id и user_login обязательны")
 
     # Запуск асинхронной задачи и ожидание ее завершения
