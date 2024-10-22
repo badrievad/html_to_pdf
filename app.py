@@ -17,7 +17,7 @@ async def generate_pdf_async(calc_id, data: PDFRequest):
     page = await browser.newPage()
 
     # Формирование URL с параметрами
-    full_url = f"{URL_TO_OFFER}/{calc_id}?user_login={data.user_login}&name={data.user_name}&email={data.user_email}&phone={data.user_phone}"
+    full_url = f"{URL_TO_OFFER}/{calc_id}?user_login={data.user_login}&name={data.user_name}&email={data.user_email}&phone={data.user_phone}&telegram={data.user_telegram}"
     # Переход на страницу с параметрами
     logging.info(f"URL: {full_url}")
     await page.goto(full_url, {"waitUntil": "networkidle2"})
