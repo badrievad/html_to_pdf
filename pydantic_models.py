@@ -7,3 +7,4 @@ class PDFRequest(BaseModel):
     user_name: str
     user_email: str
     user_phone: str
+    user_telegram: str
