@@ -1,4 +1,3 @@
-import logging
 import os
 from fastapi import FastAPI, HTTPException
 from pyppeteer import launch
@@ -6,6 +5,7 @@ from pyppeteer import launch
 from config import URL_TO_OFFER, PATH_TO_PDF
 from pydantic_models import PDFRequest
 from yandex_cloud_api import yandex_upload_file_s3
+from logger import logging
 
 app = FastAPI()
 
