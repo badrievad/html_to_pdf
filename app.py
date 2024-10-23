@@ -18,9 +18,14 @@ async def generate_pdf_async(calc_id, data: PDFRequest):
 
     # Формирование URL с параметрами
     full_url = f"{URL_TO_OFFER}/{calc_id}?user_login={data.user_login}&name={data.user_name}&email={data.user_email}&phone={data.user_phone}&telegram={data.user_telegram}"
-    # Переход на страницу с параметрами
+
     logging.info(f"URL: {full_url}")
+
+    # Переход на страницу с параметрами
     await page.goto(full_url, {"waitUntil": "networkidle2"})
+
+    # Ожидание загрузки конкретного элемента с классом financial-row
+    await page.waitForSelector(".financial-row", timeout=10000)  # Ждем до 10 секунд
 
     # Принудительно выполнить рендеринг всех шрифтов
     await page.evaluate(
@@ -34,6 +39,7 @@ async def generate_pdf_async(calc_id, data: PDFRequest):
 
     os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
 
+    # Генерация PDF
     await page.pdf(
         {
             "path": output_pdf_path,
@@ -44,6 +50,7 @@ async def generate_pdf_async(calc_id, data: PDFRequest):
 
     await browser.close()
 
+    # Загрузка PDF в Yandex Cloud
     yandex_upload_file_s3(output_pdf_path, file_name)
 
     return output_pdf_path
