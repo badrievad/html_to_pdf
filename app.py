@@ -24,8 +24,15 @@ async def generate_pdf_async(calc_id, data: PDFRequest):
     # Переход на страницу с параметрами
     await page.goto(full_url, {"waitUntil": "networkidle2"})
 
-    # Ожидание загрузки конкретного элемента с классом financial-row
-    await page.waitForSelector(".financial-row", timeout=10000)  # Ждем до 10 секунд
+    # Явное ожидание для прогрузки страницы через setTimeout
+    await page.waitFor(5000)  # Ждем 5 секунд перед проверкой элементов
+
+    # Ожидание загрузки элемента и его видимости
+    await page.waitForFunction(
+        '''document.querySelector(".financial-row") && 
+           window.getComputedStyle(document.querySelector(".financial-row")).display !== "none"''',
+        timeout=15000,  # Максимум 15 секунд ожидания
+    )
 
     # Принудительно выполнить рендеринг всех шрифтов
     await page.evaluate(
