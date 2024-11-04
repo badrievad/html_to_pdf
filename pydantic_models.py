@@ -8,3 +8,4 @@ class PDFRequest(BaseModel):
     user_email: str
     user_phone: str
     user_telegram: str
+    include_rate: str
